@@ -11,6 +11,39 @@ using System.Globalization;
 
 CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
 
+void PrintValidationErrorsAndHelp(IEnumerable<string> errors)
+{
+    foreach (var error in errors)
+    {
+        Console.Error.WriteLine($"오류: {error}");
+    }
+
+    Console.Error.WriteLine();
+    PrintHelpMessage();
+}
+
+void PrintHelpMessage()
+{
+    Console.Error.WriteLine("""
+Usage: reposcore-cs [--token <String>] [--claims <String>] [--format <String>] [--output <String>] [--sort-by <String>] [--sort-order <String>] [--keywords <String>] [--no-cache] [--help] [--version] repos0 ... reposN
+
+Arguments:
+  0: repos    대상 저장소 목록 (예: owner/repo1 owner/repo2) (Required)
+
+Options:
+  -t, --token <String>     GitHub Token (미입력시 GITHUB_TOKEN 사용)
+  --claims <String>        최근 이슈 선점 현황 조회 (issue|user)
+  -f, --format <String>    출력 형식 (csv, txt, html) (Default: csv)
+  -o, --output <String>    출력 디렉토리 경로 (Default: ./results)
+  --sort-by <String>       정렬 기준 (score | id) (Default: score)
+  --sort-order <String>    정렬 방법 (asc | desc) (Default: desc)
+  --keywords <String>      이슈 선점 키워드 (쉼표 구분, 미입력시 기본값 사용)
+  --no-cache               캐시를 무시하고 전체 데이터를 다시 수집할지 여부
+  -h, --help               Show help message
+  --version                Show version
+""");
+}
+
 CoconaApp.Run((
 [Argument(Description = "대상 저장소 목록 (예: owner/repo1 owner/repo2)")] string[] repos,
 [Option('t', Description = "GitHub Token (미입력시 GITHUB_TOKEN 사용)")] string? token = null,
@@ -23,8 +56,38 @@ CoconaApp.Run((
 [Option(Description = "캐시를 무시하고 전체 데이터를 다시 수집할지 여부")] bool noCache = false
 ) =>
 {
+    var exitCode = 0;
+    var validationErrors = new List<string>();
+
     token ??= Environment.GetEnvironmentVariable("GITHUB_TOKEN");
-    if (string.IsNullOrEmpty(token)) { Console.Error.WriteLine("오류: GitHub 토큰이 필요합니다."); return; }
+
+        if (string.IsNullOrWhiteSpace(token))
+    {
+        validationErrors.Add("GitHub 토큰이 필요합니다. --token 옵션 또는 GITHUB_TOKEN 환경 변수를 설정해 주세요.");
+    }
+
+    if (repos.Length == 0)
+    {
+        validationErrors.Add("최소 1개 이상의 저장소를 입력해야 합니다. 예: owner/repo");
+    }
+
+    foreach (var repo in repos)
+    {
+        var parts = repo.Split('/');
+
+        if (parts.Length != 2 ||
+            string.IsNullOrWhiteSpace(parts[0]) ||
+            string.IsNullOrWhiteSpace(parts[1]))
+        {
+            validationErrors.Add($"'{repo}'는 'owner/repo' 형식이 아닙니다.");
+        }
+    }
+
+    if (validationErrors.Count > 0)
+    {
+        PrintValidationErrorsAndHelp(validationErrors);
+        return 1;
+    }
 
     string[]? parsedKeywords = keywords != null
         ? keywords.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -37,7 +100,6 @@ CoconaApp.Run((
     foreach (var repo in repos)
     {
         var parts = repo.Split('/');
-        if (parts.Length != 2) { Console.Error.WriteLine($"오류: '{repo}'는 'owner/repo' 형식이 아닙니다. 건너뜁니다."); continue; }
 
         string ownerName = parts[0];
         string repoName = parts[1];
@@ -49,7 +111,7 @@ CoconaApp.Run((
         string cachePath = Path.Combine(repoOutput, "cache.json");
         var cache = CacheManager.LoadCache(cachePath, repo, noCache);
 
-        var service = new GitHubService(ownerName, repoName, token, parsedKeywords);
+        var service = new GitHubService(ownerName, repoName, token!, parsedKeywords);
 
         try
         {
@@ -206,6 +268,7 @@ CoconaApp.Run((
         catch (Exception ex)
         {
             AnsiConsole.WriteException(ex);
+            exitCode = 1;
         }
     }
 
@@ -273,6 +336,7 @@ CoconaApp.Run((
         catch (Exception ex)
         {
             AnsiConsole.WriteException(ex);
+            exitCode = 1;
         }
     }
 
@@ -286,7 +350,7 @@ CoconaApp.Run((
 
             string ownerName = parts[0];
             string repoName = parts[1];
-            var service = new GitHubService(ownerName, repoName, token, parsedKeywords);
+            var service = new GitHubService(ownerName, repoName, token!, parsedKeywords);
 
             try
             {
@@ -298,7 +362,9 @@ CoconaApp.Run((
             catch (Exception ex)
             {
                 AnsiConsole.WriteException(ex);
+                exitCode = 1;
             }
         }
     }
+    return exitCode;
 });
