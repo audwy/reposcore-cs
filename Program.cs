@@ -25,22 +25,24 @@ void PrintValidationErrorsAndHelp(IEnumerable<string> errors)
 void PrintHelpMessage()
 {
     Console.Error.WriteLine("""
-Usage: reposcore-cs [--token <String>] [--claims <String>] [--format <String>] [--output <String>] [--sort-by <String>] [--sort-order <String>] [--keywords <String>] [--no-cache] [--help] [--version] repos0 ... reposN
+Usage: reposcore-cs [--token <String>] [--claims <ClaimsMode>] [--format <OutputFormat>] [--output <String>] [--sort-by <SortBy>] [--sort-order <SortOrder>] [--keywords <String>] [--no-cache] [--help] [--version] repos0 ... reposN
+
+reposcore-cs
 
 Arguments:
   0: repos    대상 저장소 목록 (예: owner/repo1 owner/repo2) (Required)
 
 Options:
-  -t, --token <String>     GitHub Token (미입력시 GITHUB_TOKEN 사용)
-  --claims <String>        최근 이슈 선점 현황 조회 (issue|user)
-  -f, --format <String>    출력 형식 (csv, txt, html) (Default: csv)
-  -o, --output <String>    출력 디렉토리 경로 (Default: ./results)
-  --sort-by <String>       정렬 기준 (score | id) (Default: score)
-  --sort-order <String>    정렬 방법 (asc | desc) (Default: desc)
-  --keywords <String>      이슈 선점 키워드 (쉼표 구분, 미입력시 기본값 사용)
-  --no-cache               캐시를 무시하고 전체 데이터를 다시 수집할지 여부
-  -h, --help               Show help message
-  --version                Show version
+  -t, --token <String>           GitHub Token (미입력시 GITHUB_TOKEN 사용)
+  --claims <ClaimsMode>          최근 이슈 선점 현황 조회 (Allowed values: Issue, User)
+  -f, --format <OutputFormat>    출력 형식 (Default: Csv) (Allowed values: Csv, Txt, Html)
+  -o, --output <String>          출력 디렉토리 경로 (Default: ./results)
+  --sort-by <SortBy>             정렬 기준 (Default: Score) (Allowed values: Score, Id)
+  --sort-order <SortOrder>       정렬 방법 (Default: Desc) (Allowed values: Asc, Desc)
+  --keywords <String>            이슈 선점 키워드 (쉼표 구분, 미입력시 기본값 사용)
+  --no-cache                     캐시를 무시하고 전체 데이터를 다시 수집할지 여부
+  -h, --help                     Show help message
+  --version                      Show version
 """);
 }
 
@@ -61,7 +63,7 @@ CoconaApp.Run((
 
     token ??= Environment.GetEnvironmentVariable("GITHUB_TOKEN");
 
-        if (string.IsNullOrWhiteSpace(token))
+    if (string.IsNullOrWhiteSpace(token))
     {
         validationErrors.Add("GitHub 토큰이 필요합니다. --token 옵션 또는 GITHUB_TOKEN 환경 변수를 설정해 주세요.");
     }
